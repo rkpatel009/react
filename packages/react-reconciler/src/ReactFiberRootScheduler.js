@@ -80,6 +80,7 @@ import {
   resetNestedUpdateFlag,
   syncNestedUpdateFlag,
 } from './ReactProfilerTimer';
+import {peekEntangledActionLane} from './ReactFiberAsyncAction';
 
 import noop from 'shared/noop';
 import reportGlobalError from 'shared/reportGlobalError';
@@ -684,7 +685,15 @@ export function requestTransitionLane(
   // over. Our heuristic for that is whenever we enter a concurrent work loop.
   if (currentEventTransitionLane === NoLane) {
     // All transitions within the same event are assigned the same lane.
-    currentEventTransitionLane = claimNextTransitionLane();
+    const actionScopeLane = peekEntangledActionLane();
+    currentEventTransitionLane =
+      actionScopeLane !== NoLane
+        ? // We're inside an async action scope. Reuse the same lane.
+          actionScopeLane
+        : // We may or may not be inside an async action scope. If we are, this
+          // is the first update in that scope. Either way, we need to get a
+          // fresh transition lane.
+          claimNextTransitionLane();
   }
   return currentEventTransitionLane;
 }
